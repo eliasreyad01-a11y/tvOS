@@ -105,7 +105,7 @@ object TvManager {
     fun homes(ctx: Context): List<HomeApp> {
         val pm = ctx.packageManager
         return try {
-            pm.queryIntentActivities(homeIntent(), PackageManager.MATCH_ALL).map {
+            pm.queryIntentActivities(homeIntent(), PackageManager.MATCH_ALL or PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS).map {
                 HomeApp(it.activityInfo.packageName, "${it.activityInfo.packageName}/${it.activityInfo.name}", it.loadLabel(pm).toString())
             }.distinctBy { it.component }
         } catch (_: Exception) { emptyList() }

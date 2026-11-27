@@ -24,7 +24,7 @@ import android.widget.Toast
 class SettingsActivity : Activity() {
 
     private sealed class Row {
-        class Nav(val title: String, val value: () -> String? = { null }, val chevron: Boolean = true, val go: () -> Unit) : Row()
+        class Nav(val title: String, val value: () -> String? = { null }, val chevron: Boolean = true, val desc: String = "", val go: () -> Unit) : Row()
         class Toggle(val title: String, val key: String, val desc: String) : Row()
         class Switch(val title: String, val get: () -> Boolean, val set: (Boolean) -> Unit, val desc: String = "") : Row()
         class Label(val text: String) : Row()
@@ -81,12 +81,12 @@ class SettingsActivity : Activity() {
     private fun tvManager() = Page("TV Manager") {
         listOf(
             Row.Label("CONNECTION"),
-            Row.Nav("Connect to TV", { L.t(if (TvManager.connected) "Connected" else "Not connected") }, false) { connectTv() },
+            Row.Nav("Connect to TV", { L.t(if (TvManager.connected) "Connected" else "Not connected") }, false, "Lets the launcher stop, disable or remove apps and change the default launcher. If it fails, set the Port or Pair first.") { connectTv() },
             Row.Label("The connection is only needed to stop, disable or remove apps and to choose the default launcher."),
-            Row.Nav("Port", { TvManager.port(prefs).toString() }) {
+            Row.Nav("Port", { TvManager.port(prefs).toString() }, true, "The TV's ADB port: 5555 for Network debugging, or the port shown on the TV under Wireless debugging.") {
                 askText("Port", TvManager.port(prefs).toString(), true) { v -> v.toIntOrNull()?.let { prefs.edit().putInt("tvm_port", it).apply(); TvManager.disconnect(); refresh() } }
             },
-            Row.Nav("Pair with Pairing Code") { pairTv() },
+            Row.Nav("Pair with Pairing Code", { null }, true, "Only for Android 11+ with Wireless debugging, once: on the TV choose Pair device with pairing code, then type the port and the code shown there.") { pairTv() },
             Row.Label("HOME SCREEN"),
             Row.Nav("Default Launcher", { val c = TvManager.currentHome(this); TvManager.homes(this).firstOrNull { it.pkg == c }?.label }) { push(tvHome()) },
             Row.Label("APPS"),
@@ -104,7 +104,8 @@ class SettingsActivity : Activity() {
     /** The home screens installed on the TV; picking one makes it the default (Home button). */
     private fun tvHome() = Page("Default Launcher") {
         val cur = TvManager.currentHome(this)
-        TvManager.homes(this).map { h ->
+        val all = TvManager.homes(this)
+        (if (all.size < 2) listOf<Row>(Row.Label("No other launcher was found on this TV")) else emptyList()) + all.map { h ->
             Row.Nav(h.label, { if (h.pkg == cur) "✓" else null }, false) {
                 if (h.pkg == cur) return@Nav
                 Thread {
@@ -298,7 +299,9 @@ class SettingsActivity : Activity() {
             Row.Nav("Unhide All Apps") {
                 Store(this).hidden = emptySet()
                 Toast.makeText(this, "All apps are visible again", Toast.LENGTH_SHORT).show()
-            }
+            },
+            Row.Label("LAUNCHER"),
+            Row.Nav("Default Launcher", { val c = TvManager.currentHome(this); TvManager.homes(this).firstOrNull { it.pkg == c }?.label }, true, "Choose which home screen opens on the Home button: this launcher or the TV's original one.") { push(tvHome()) }
         )
     }
 
@@ -537,7 +540,7 @@ class SettingsActivity : Activity() {
             }
             else -> {}
         }
-        if (r is Row.Nav) row.setOnFocusChangeListener { _, f -> if (f) descView.text = "" }
+        if (r is Row.Nav) row.setOnFocusChangeListener { _, f -> if (f) descView.text = L.t(r.desc) }
         return row
     }
 

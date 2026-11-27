@@ -42,25 +42,34 @@ object Thumbs {
 
     fun get(url: String): Bitmap? = cache.get(url)
 
+    // Quietly fetches the pictures just below the visible rows, one at a time, so a scroll finds them ready instead of grey.
+    private val ahead = Executors.newSingleThreadExecutor()
+    fun prefetch(url: String) {
+        if (cache.get(url) != null) return
+        ahead.execute { if (cache.get(url) == null) fetch(url)?.let { cache.put(url, it) } }
+    }
+
     fun clear() = cache.evictAll()
 
     fun load(url: String, wanted: () -> Boolean = { true }, done: (Bitmap?) -> Unit) {
         cache.get(url)?.let { done(it); return }
         pool.execute {
             if (!wanted()) return@execute
-            val bytes = Net2.download(url, 6_000_000)
-            val bmp = bytes?.let { b ->
-                try {
-                    val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeByteArray(b, 0, b.size, o)
-                    var s = 1
-                    while (o.outWidth / (s * 2) >= 1100) s *= 2   // sharp on a 4K screen; 16-bit colour keeps each one at about 2 MB
-                    BitmapFactory.decodeByteArray(b, 0, b.size, BitmapFactory.Options().apply { inSampleSize = s; inPreferredConfig = Bitmap.Config.RGB_565 })
-                } catch (_: Throwable) { null }
-            }
+            val bmp = fetch(url)
             if (bmp != null) cache.put(url, bmp)
             main.post { done(bmp) }
         }
+    }
+
+    private fun fetch(url: String): Bitmap? {
+        val bytes = Net2.download(url, 6_000_000) ?: return null
+        return try {
+            val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+            var s = 1
+            while (o.outWidth / (s * 2) >= 1100) s *= 2   // sharp on a 4K screen; 16-bit colour keeps each one at about 2 MB
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = s; inPreferredConfig = Bitmap.Config.RGB_565 })
+        } catch (_: Throwable) { null }
     }
 }
 
@@ -114,7 +123,7 @@ object Net2 {
                 val base = o.optString("urlbase")
                 if (!base.startsWith("/th?id=OHR.")) continue
                 val title = o.optString("title").ifEmpty { base.substringAfter("OHR.").substringBefore('_') }.take(46)
-                out.add(OnlineWp(title, "https://www.bing.com${base}_1366x768.jpg", "https://www.bing.com${base}_UHD.jpg"))
+                out.add(OnlineWp(title, "https://www.bing.com${base}_1280x720.jpg", "https://www.bing.com${base}_UHD.jpg"))
             }
         } catch (_: Exception) {}
         return out
@@ -393,6 +402,7 @@ class Pages(private val a: MainActivity) {
             val it = items[position]
             h.item = it
             h.v.failed = false
+            for (k in 1..8) items.getOrNull(position + k)?.let { n -> Thumbs.prefetch(n.thumb) }
             h.v.bmp = Thumbs.get(it.thumb)
             if (h.v.bmp == null) Thumbs.load(it.thumb, { h.item === it }) { b ->
                 if (h.item === it) { if (b != null) h.v.bmp = b else h.v.failed = true }
