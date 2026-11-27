@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.mytv.tvos"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.mytv.tvos"
