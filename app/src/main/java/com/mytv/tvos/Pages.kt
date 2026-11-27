@@ -33,7 +33,10 @@ class OnlineWp(val title: String, val thumb: String, val full: String)
 
 /** Small pictures for the wallpaper grid: downloaded off the main thread, cached, and decoded small. */
 object Thumbs {
-    private val pool = Executors.newFixedThreadPool(3)
+    // Newest request first: the pictures on screen load before the ones already scrolled past, and a request whose tile has been
+    // recycled is dropped before it downloads anything. (A plain FIFO pool made every scroll wait behind all the earlier tiles.)
+    private val pool = java.util.concurrent.ThreadPoolExecutor(4, 4, 30, java.util.concurrent.TimeUnit.SECONDS,
+        object : java.util.concurrent.LinkedBlockingDeque<Runnable>() { override fun offer(e: Runnable) = offerFirst(e) })
     private val main = Handler(Looper.getMainLooper())
     private val cache = object : LruCache<String, Bitmap>(64 * 1024 * 1024) { override fun sizeOf(key: String, value: Bitmap) = value.byteCount }
 
@@ -41,9 +44,10 @@ object Thumbs {
 
     fun clear() = cache.evictAll()
 
-    fun load(url: String, done: (Bitmap?) -> Unit) {
+    fun load(url: String, wanted: () -> Boolean = { true }, done: (Bitmap?) -> Unit) {
         cache.get(url)?.let { done(it); return }
         pool.execute {
+            if (!wanted()) return@execute
             val bytes = Net2.download(url, 6_000_000)
             val bmp = bytes?.let { b ->
                 try {
@@ -110,7 +114,7 @@ object Net2 {
                 val base = o.optString("urlbase")
                 if (!base.startsWith("/th?id=OHR.")) continue
                 val title = o.optString("title").ifEmpty { base.substringAfter("OHR.").substringBefore('_') }.take(46)
-                out.add(OnlineWp(title, "https://www.bing.com${base}_1920x1080.jpg", "https://www.bing.com${base}_UHD.jpg"))
+                out.add(OnlineWp(title, "https://www.bing.com${base}_1366x768.jpg", "https://www.bing.com${base}_UHD.jpg"))
             }
         } catch (_: Exception) {}
         return out
@@ -390,7 +394,7 @@ class Pages(private val a: MainActivity) {
             h.item = it
             h.v.failed = false
             h.v.bmp = Thumbs.get(it.thumb)
-            if (h.v.bmp == null) Thumbs.load(it.thumb) { b ->
+            if (h.v.bmp == null) Thumbs.load(it.thumb, { h.item === it }) { b ->
                 if (h.item === it) { if (b != null) h.v.bmp = b else h.v.failed = true }
             }
         }
@@ -429,6 +433,7 @@ class Pages(private val a: MainActivity) {
             layoutManager = RowScrollGrid(a, 4)
             adapter = ad
             itemAnimator = null
+            setHasFixedSize(true); setItemViewCacheSize(12)
             overScrollMode = View.OVER_SCROLL_NEVER
             clipChildren = false; clipToPadding = false
             setPadding(u.i(12f), u.i(20f), u.i(12f), u.i(60f))

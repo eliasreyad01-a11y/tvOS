@@ -245,16 +245,14 @@ class MainActivity : Activity() {
         tv.setTextColor(Glass.text())
         tv.text = L.t("Stop Adhan")
         tv.isDuplicateParentStateEnabled = true
-        val icon = iconView(R.drawable.ic_prayer).apply { imageTintList = Glass.text(); isDuplicateParentStateEnabled = true }
         stopPill = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(u.i(26f), 0, u.i(34f), 0)
+            setPadding(u.i(34f), 0, u.i(34f), 0)
             isFocusable = true
             isClickable = true
             visibility = View.GONE
             background = Glass.rowBg(u, 36f, 0x40FFFFFF, true)
-            addView(icon, LinearLayout.LayoutParams(u.i(40f), u.i(40f)).apply { marginEnd = u.i(14f) })
             addView(tv)
             setOnClickListener { AdhanService.stopNow(); updateStopPill() }
         }
@@ -264,7 +262,7 @@ class MainActivity : Activity() {
     /** The Stop button exists on the home screen only while the Adhan is actually playing. */
     private fun updateStopPill() {
         val playing = AdhanService.isPlaying
-        if (playing) ((stopPill as LinearLayout).getChildAt(1) as TextView).text = L.t("Stop Adhan") + (AdhanService.currentPrayer?.let { " · " + L.t(it) } ?: "")
+        if (playing) ((stopPill as LinearLayout).getChildAt(0) as TextView).text = L.t("Stop Adhan") + (AdhanService.currentPrayer?.let { " · " + L.t(it) } ?: "")
         stopPill.visibility = if (playing) View.VISIBLE else View.GONE
         if (playing && !adhanWasPlaying && ccView == null && folderView == null && moving == null) stopPill.requestFocus()
         if (!playing && adhanWasPlaying && stopPill.hasFocus()) lastFocusKey?.let { focusKey(it) }
