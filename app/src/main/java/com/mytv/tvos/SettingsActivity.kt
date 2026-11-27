@@ -42,8 +42,6 @@ class SettingsActivity : Activity() {
     private var selectedIndex = ArrayList<Int>()
 
     private val p by lazy { Prefs(this) }
-    private val TV_MANAGER = "com.elias.tvmanager"
-
     private fun toast(s: String) = Toast.makeText(this, L.t(s), Toast.LENGTH_SHORT).show()
     private fun choose(title: String, items: List<Pair<String, () -> Unit>>) { Menus.show(this, title, items) }
     private fun reschedule() = AdhanScheduler.reschedule(this)
@@ -72,15 +70,129 @@ class SettingsActivity : Activity() {
             Row.Nav("Apps", go = sys(Settings.ACTION_APPLICATION_SETTINGS)),
             Row.Nav("Network", go = sys(Settings.ACTION_WIFI_SETTINGS)),
             Row.Nav("System", go = sys(Settings.ACTION_SETTINGS)),
-            Row.Nav("TV Manager", go = { openTvManager() })
+            Row.Nav("TV Manager") { push(tvManager()) }
         )
     }
 
-    /** TV Manager (the user's own debloat / tweaks app, package com.elias.tvmanager) opens from here; if it is not installed, say so. */
-    private fun openTvManager() {
-        val i = packageManager.getLeanbackLaunchIntentForPackage(TV_MANAGER) ?: packageManager.getLaunchIntentForPackage(TV_MANAGER)
-        if (i == null) { toast("TV Manager is not installed"); return }
-        try { startActivity(i) } catch (_: Exception) { toast("Not available on this device") }
+    // ---------------------------------------------------------------- TV Manager (built in)
+
+    private fun ui(f: () -> Unit) = runOnUiThread { if (!isDestroyed) f() }
+
+    private fun tvManager() = Page("TV Manager") {
+        listOf(
+            Row.Label("CONNECTION"),
+            Row.Nav("Status", { L.t(if (TvManager.connected) "Connected" else "Not connected") }, false) { connectTv() },
+            Row.Nav("Port", { TvManager.port(prefs).toString() }) {
+                askText("Port", TvManager.port(prefs).toString(), true) { v -> v.toIntOrNull()?.let { prefs.edit().putInt("tvm_port", it).apply(); TvManager.disconnect(); refresh() } }
+            },
+            Row.Nav("Pair with Pairing Code") { pairTv() },
+            Row.Label("APPS"),
+            Row.Nav("Installed Apps") { push(tvApps(false)) },
+            Row.Nav("System Apps") { push(tvApps(true)) },
+            Row.Nav("Restore Removed Apps", { TvManager.logged(prefs).size.toString().takeIf { it != "0" } }) { push(tvRestore()) },
+            Row.Label("TV"),
+            Row.Nav("Memory", { TvManager.memoryText(this) }, false) {},
+            Row.Nav("Storage", { TvManager.storageText() }, false) {},
+            Row.Nav("Free Memory") { adb("Memory freed", "am kill-all") },
+            Row.Label("Turn on Developer Options, then Wireless debugging (or Network debugging) on the TV.")
+        )
+    }
+
+    private fun tvApps(system: Boolean) = Page(if (system) "System Apps" else "Installed Apps") {
+        val list = TvManager.apps(this) { ui { refresh() } }
+        if (list == null) listOf<Row>(Row.Label("Loading..."))
+        else list.filter { it.system == system }.map { a ->
+            Row.Nav(a.label, { if (!a.enabled) L.t("Disabled") else null }) { appMenu(a) }
+        }
+    }
+
+    private fun appMenu(a: TvManager.AppRow) {
+        if (a.pkg in TvManager.PROTECTED) { toast("This app is protected"); return }
+        val items = ArrayList<Pair<String, () -> Unit>>()
+        items.add("Stop" to { adb("Stopped", "am force-stop ${a.pkg}") })
+        if (a.enabled) items.add("Disable" to { adb("Disabled", "pm disable-user --user 0 ${a.pkg}", a.pkg, "disabled") })
+        else items.add("Enable" to { adb("Enabled", "pm enable ${a.pkg}", a.pkg, null) })
+        items.add("Remove for This User" to {
+            choose(a.label, listOf("Remove for This User" to { adb("Removed", "pm uninstall --user 0 ${a.pkg}", a.pkg, "removed") }, "Cancel" to {}))
+        })
+        choose(a.label, items)
+    }
+
+    private fun tvRestore() = Page("Restore Removed Apps") {
+        val l = TvManager.logged(prefs)
+        if (l.isEmpty()) listOf<Row>(Row.Label("Nothing to restore"))
+        else listOf<Row>(Row.Nav("Restore Everything") {
+            Thread {
+                var bad = 0
+                if (!ensureTv()) { ui { toast("Not connected to the TV") }; return@Thread }
+                for ((pkg, act) in l) { val r = TvManager.restore(pkg, act); if (r.first == 0) TvManager.log(prefs, pkg, null) else bad++ }
+                TvManager.invalidate()
+                ui { toast(if (bad == 0) "Restored" else "Some apps could not be restored"); refresh() }
+            }.start()
+        }) + l.map { (pkg, act) ->
+            Row.Nav(pkg, { L.t(if (act == "removed") "Removed" else "Disabled") }, false) {
+                adb("Restored", if (act == "removed") "cmd package install-existing $pkg" else "pm enable $pkg", pkg, null)
+            }
+        }
+    }
+
+    /** Connects if needed; true when the TV's ADB answers. Off the main thread. */
+    private fun ensureTv(): Boolean {
+        if (TvManager.connected && TvManager.sh("echo ok").first == 0) return true
+        return TvManager.connect(applicationContext, TvManager.port(prefs)) == null
+    }
+
+    private fun connectTv() {
+        toast("Connecting...")
+        Thread {
+            val err = TvManager.connect(applicationContext, TvManager.port(prefs))
+            ui {
+                if (err == null) toast("Connected")
+                else { toast("Could not connect"); descView.text = err }
+                refresh()
+            }
+        }.start()
+    }
+
+    private fun adb(done: String, cmd: String, pkg: String? = null, log: String? = null) {
+        Thread {
+            if (!ensureTv()) { ui { toast("Not connected to the TV"); descView.text = L.t("Open TV Manager and connect first") }; return@Thread }
+            val r = TvManager.sh(cmd)
+            ui {
+                if (r.first == 0) {
+                    if (pkg != null) TvManager.log(prefs, pkg, log)
+                    TvManager.invalidate(); toast(done)
+                } else descView.text = r.second.take(120)
+                refresh()
+            }
+        }.start()
+    }
+
+    private fun pairTv() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(u.i(30f), u.i(10f), u.i(30f), 0) }
+        val port = android.widget.EditText(this).apply { setSingleLine(); hint = L.t("Pairing port"); inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+        val code = android.widget.EditText(this).apply { setSingleLine(); hint = L.t("Pairing code"); inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+        box.addView(port); box.addView(code)
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
+            .setTitle(L.t("Pair with Pairing Code")).setView(box)
+            .setPositiveButton(L.t("Pair")) { _, _ ->
+                val pt = port.text.toString().trim().toIntOrNull(); val c = code.text.toString().trim()
+                if (pt == null || c.isEmpty()) return@setPositiveButton
+                toast("Pairing...")
+                Thread {
+                    val err = TvManager.pair(applicationContext, pt, c)
+                    ui { if (err == null) toast("Paired. Now set the Port to the one shown under Wireless debugging and connect.") else { toast("Pairing failed"); descView.text = err } }
+                }.start()
+            }
+            .setNegativeButton(L.t("Cancel"), null).show()
+    }
+
+    private fun askText(title: String, def: String, number: Boolean, onOk: (String) -> Unit) {
+        val input = android.widget.EditText(this).apply { setSingleLine(); setText(def); if (number) inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
+            .setTitle(L.t(title)).setView(input)
+            .setPositiveButton(L.t("OK")) { _, _ -> onOk(input.text.toString().trim()) }
+            .setNegativeButton(L.t("Cancel"), null).show()
     }
 
     private fun general() = Page("General") {

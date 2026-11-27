@@ -11,8 +11,8 @@ android {
         applicationId = "com.mytv.tvos"
         minSdk = 26
         targetSdk = 34
-        versionCode = 33
-        versionName = "2.9.9"
+        versionCode = 34
+        versionName = "3.0.0"
     }
 
     signingConfigs {
@@ -52,6 +52,7 @@ tasks.withType<Test>().configureEach {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("com.flyfishxu:kadb:2.1.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.12.2")
