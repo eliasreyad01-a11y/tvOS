@@ -95,6 +95,30 @@ object TvManager {
     fun restore(pkg: String, action: String): Pair<Int, String> =
         if (action == "removed") sh("cmd package install-existing $pkg") else sh("pm enable $pkg")
 
+    // ------------------------------------------------------------ default home screen
+
+    class HomeApp(val pkg: String, val component: String, val label: String)
+
+    private fun homeIntent() = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
+
+    /** Every launcher installed on the TV (this one and the original Android one among them). */
+    fun homes(ctx: Context): List<HomeApp> {
+        val pm = ctx.packageManager
+        return try {
+            pm.queryIntentActivities(homeIntent(), PackageManager.MATCH_ALL).map {
+                HomeApp(it.activityInfo.packageName, "${it.activityInfo.packageName}/${it.activityInfo.name}", it.loadLabel(pm).toString())
+            }.distinctBy { it.component }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /** The launcher that opens on the Home key now, or null when Android would still ask. */
+    fun currentHome(ctx: Context): String? = try {
+        ctx.packageManager.resolveActivity(homeIntent(), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName?.takeIf { it != "android" }
+    } catch (_: Exception) { null }
+
+    /** Makes [h] the launcher of the Home key (it is turned on first in case it had been disabled). */
+    fun setHome(h: HomeApp): Pair<Int, String> = sh("pm enable ${h.pkg}; cmd package set-home-activity ${h.component}")
+
     // ------------------------------------------------------------ memory and storage
 
     fun fmt(bytes: Long): String = if (bytes >= 1L shl 30) String.format(java.util.Locale.US, "%.1f GB", bytes / 1073741824.0) else "${bytes shr 20} MB"

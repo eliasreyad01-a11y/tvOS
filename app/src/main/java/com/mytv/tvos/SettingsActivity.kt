@@ -86,6 +86,8 @@ class SettingsActivity : Activity() {
                 askText("Port", TvManager.port(prefs).toString(), true) { v -> v.toIntOrNull()?.let { prefs.edit().putInt("tvm_port", it).apply(); TvManager.disconnect(); refresh() } }
             },
             Row.Nav("Pair with Pairing Code") { pairTv() },
+            Row.Label("HOME SCREEN"),
+            Row.Nav("Default Home Screen", { val c = TvManager.currentHome(this); TvManager.homes(this).firstOrNull { it.pkg == c }?.label }) { chooseHome() },
             Row.Label("APPS"),
             Row.Nav("Installed Apps") { push(tvApps(false)) },
             Row.Nav("System Apps") { push(tvApps(true)) },
@@ -96,6 +98,22 @@ class SettingsActivity : Activity() {
             Row.Nav("Free Memory") { adb("Memory freed", "am kill-all") },
             Row.Label("Turn on Developer Options, then Wireless debugging (or Network debugging) on the TV.")
         )
+    }
+
+    /** Pick which launcher opens on the Home key: this one, or the TV's original Android launcher. */
+    private fun chooseHome() {
+        val cur = TvManager.currentHome(this)
+        val all = TvManager.homes(this)
+        if (all.size < 2) { toast("No other home screen is installed"); return }
+        choose("Default Home Screen", all.map { h ->
+            (h.label + if (h.pkg == cur) "  ✓" else "") to {
+                Thread {
+                    if (!ensureTv()) { ui { toast("Not connected to the TV"); descView.text = L.t("Open TV Manager and connect first") }; return@Thread }
+                    val r = TvManager.setHome(h)
+                    ui { if (r.first == 0) toast("Home screen changed") else descView.text = r.second.take(120); refresh() }
+                }.start()
+            }
+        })
     }
 
     private fun tvApps(system: Boolean) = Page(if (system) "System Apps" else "Installed Apps") {
