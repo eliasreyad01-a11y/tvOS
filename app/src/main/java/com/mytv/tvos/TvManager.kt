@@ -45,7 +45,7 @@ object TvManager {
     /** Pairing with a code (Android 11+ Wireless debugging › Pair device with pairing code). Returns null on success. */
     fun pair(ctx: Context, port: Int, code: String): String? {
         prep(ctx)
-        return try { Kadb.pair(HOST, port, code); null } catch (e: Throwable) { e.message?.take(80) ?: e.javaClass.simpleName }
+        return try { kotlinx.coroutines.runBlocking { Kadb.pair(HOST, port, code) }; null } catch (e: Throwable) { e.message?.take(80) ?: e.javaClass.simpleName }
     }
 
     fun disconnect() { try { kadb?.close() } catch (_: Exception) {}; kadb = null }
