@@ -70,7 +70,7 @@ class SettingsActivity : Activity() {
             Row.Nav("Apps", go = sys(Settings.ACTION_APPLICATION_SETTINGS)),
             Row.Nav("Network", go = sys(Settings.ACTION_WIFI_SETTINGS)),
             Row.Nav("System", go = sys(Settings.ACTION_SETTINGS)),
-            Row.Nav("TV Manager") { push(tvManager()) }
+            Row.Nav("TV Manager") { openTvManager() }
         )
     }
 
@@ -81,39 +81,56 @@ class SettingsActivity : Activity() {
     private fun tvManager() = Page("TV Manager") {
         listOf(
             Row.Label("CONNECTION"),
-            Row.Nav("Status", { L.t(if (TvManager.connected) "Connected" else "Not connected") }, false) { connectTv() },
+            Row.Nav("Connect to TV", { L.t(if (TvManager.connected) "Connected" else "Not connected") }, false) { connectTv() },
+            Row.Label("The connection is only needed to stop, disable or remove apps and to choose the default launcher."),
             Row.Nav("Port", { TvManager.port(prefs).toString() }) {
                 askText("Port", TvManager.port(prefs).toString(), true) { v -> v.toIntOrNull()?.let { prefs.edit().putInt("tvm_port", it).apply(); TvManager.disconnect(); refresh() } }
             },
             Row.Nav("Pair with Pairing Code") { pairTv() },
             Row.Label("HOME SCREEN"),
-            Row.Nav("Default Home Screen", { val c = TvManager.currentHome(this); TvManager.homes(this).firstOrNull { it.pkg == c }?.label }) { chooseHome() },
+            Row.Nav("Default Launcher", { TvManager.homes(this).firstOrNull { it.current }?.label }) { push(tvHome()) },
             Row.Label("APPS"),
             Row.Nav("Installed Apps") { push(tvApps(false)) },
             Row.Nav("System Apps") { push(tvApps(true)) },
             Row.Nav("Restore Removed Apps", { TvManager.logged(prefs).size.toString().takeIf { it != "0" } }) { push(tvRestore()) },
             Row.Label("TV"),
-            Row.Nav("Memory", { TvManager.memoryText(this) }, false) {},
+            Row.Nav("Memory", { TvManager.memoryText(this) }, false) { refresh() },
             Row.Nav("Storage", { TvManager.storageText() }, false) {},
-            Row.Nav("Free Memory") { adb("Memory freed", "am kill-all") },
+            Row.Nav("Free Memory") { freeMem() },
             Row.Label("Turn on Developer Options, then Wireless debugging (or Network debugging) on the TV.")
         )
     }
 
-    /** Pick which launcher opens on the Home key: this one, or the TV's original Android launcher. */
-    private fun chooseHome() {
-        val cur = TvManager.currentHome(this)
-        val all = TvManager.homes(this)
-        if (all.size < 2) { toast("No other home screen is installed"); return }
-        choose("Default Home Screen", all.map { h ->
-            (h.label + if (h.pkg == cur) "  ✓" else "") to {
+    /** The home screens installed on the TV; picking one makes it the default (Home button). */
+    private fun tvHome() = Page("Default Launcher") {
+        TvManager.homes(this).map { h ->
+            Row.Nav(h.label, { if (h.current) "✓" else null }, false) {
+                if (h.current) return@Nav
                 Thread {
-                    if (!ensureTv()) { ui { toast("Not connected to the TV"); descView.text = L.t("Open TV Manager and connect first") }; return@Thread }
-                    val r = TvManager.setHome(h)
-                    ui { if (r.first == 0) toast("Home screen changed") else descView.text = r.second.take(120); refresh() }
+                    if (ensureTv()) {
+                        val r = TvManager.setHome(h.component)
+                        ui { if (r.first == 0) toast("Default launcher changed") else { toast("Could not change the launcher"); descView.text = L.t(r.second).take(120) }; refresh() }
+                    } else ui {
+                        // No ADB link: the best that is possible is to open the system's own choice, if the TV has one.
+                        try { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) } catch (_: Exception) { toast("Connect to the TV first") }
+                    }
                 }.start()
             }
-        })
+        }
+    }
+
+    private fun freeMem() {
+        toast("Freeing memory...")
+        Thread {
+            val gained = try { TvManager.freeMemory(applicationContext) } catch (_: Exception) { 0L }
+            ui { toast(L.t("Memory freed") + ": " + TvManager.fmt(gained)); refresh() }
+        }.start()
+    }
+
+    /** Opening the page tries the link quietly, so most of the time it is already connected. */
+    private fun openTvManager() {
+        push(tvManager())
+        if (!TvManager.connected) Thread { if (TvManager.connect(applicationContext, TvManager.port(prefs)) == null) ui { if (stack.lastOrNull()?.title == "TV Manager") refresh() } }.start()
     }
 
     private fun tvApps(system: Boolean) = Page(if (system) "System Apps" else "Installed Apps") {
@@ -166,7 +183,7 @@ class SettingsActivity : Activity() {
             val err = TvManager.connect(applicationContext, TvManager.port(prefs))
             ui {
                 if (err == null) toast("Connected")
-                else { toast("Could not connect"); descView.text = err }
+                else { toast("Could not connect"); descView.text = L.t(err) }
                 refresh()
             }
         }.start()
@@ -180,7 +197,7 @@ class SettingsActivity : Activity() {
                 if (r.first == 0) {
                     if (pkg != null) TvManager.log(prefs, pkg, log)
                     TvManager.invalidate(); toast(done)
-                } else descView.text = r.second.take(120)
+                } else descView.text = L.t(r.second).take(120)
                 refresh()
             }
         }.start()
@@ -199,7 +216,7 @@ class SettingsActivity : Activity() {
                 toast("Pairing...")
                 Thread {
                     val err = TvManager.pair(applicationContext, pt, c)
-                    ui { if (err == null) toast("Paired. Now set the Port to the one shown under Wireless debugging and connect.") else { toast("Pairing failed"); descView.text = err } }
+                    ui { if (err == null) toast("Paired. Now set the Port to the one shown under Wireless debugging and connect.") else { toast("Pairing failed"); descView.text = L.t(err) } }
                 }.start()
             }
             .setNegativeButton(L.t("Cancel"), null).show()
