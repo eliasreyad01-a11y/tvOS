@@ -88,7 +88,7 @@ class SettingsActivity : Activity() {
             },
             Row.Nav("Pair with Pairing Code") { pairTv() },
             Row.Label("HOME SCREEN"),
-            Row.Nav("Default Launcher", { TvManager.homes(this).firstOrNull { it.current }?.label }) { push(tvHome()) },
+            Row.Nav("Default Launcher", { val c = TvManager.currentHome(this); TvManager.homes(this).firstOrNull { it.pkg == c }?.label }) { push(tvHome()) },
             Row.Label("APPS"),
             Row.Nav("Installed Apps") { push(tvApps(false)) },
             Row.Nav("System Apps") { push(tvApps(true)) },
@@ -103,12 +103,13 @@ class SettingsActivity : Activity() {
 
     /** The home screens installed on the TV; picking one makes it the default (Home button). */
     private fun tvHome() = Page("Default Launcher") {
+        val cur = TvManager.currentHome(this)
         TvManager.homes(this).map { h ->
-            Row.Nav(h.label, { if (h.current) "✓" else null }, false) {
-                if (h.current) return@Nav
+            Row.Nav(h.label, { if (h.pkg == cur) "✓" else null }, false) {
+                if (h.pkg == cur) return@Nav
                 Thread {
                     if (ensureTv()) {
-                        val r = TvManager.setHome(h.component)
+                        val r = TvManager.setHome(h)
                         ui { if (r.first == 0) toast("Default launcher changed") else { toast("Could not change the launcher"); descView.text = L.t(r.second).take(120) }; refresh() }
                     } else ui {
                         // No ADB link: the best that is possible is to open the system's own choice, if the TV has one.

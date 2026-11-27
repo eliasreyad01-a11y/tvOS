@@ -134,23 +134,6 @@ object TvManager {
         "${fmt(s.availableBytes)} / ${fmt(s.totalBytes)}"
     } catch (_: Exception) { "" }
 
-    // ------------------------------------------------------------ default launcher
-
-    class Home(val label: String, val component: android.content.ComponentName, val current: Boolean)
-
-    /** Every app that can be the home screen, and which one is the default now. */
-    fun homes(ctx: Context): List<Home> {
-        val pm = ctx.packageManager
-        val i = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
-        val cur = pm.resolveActivity(i, 0)?.activityInfo?.packageName
-        return pm.queryIntentActivities(i, 0).map {
-            Home(it.loadLabel(pm).toString(), android.content.ComponentName(it.activityInfo.packageName, it.activityInfo.name), it.activityInfo.packageName == cur)
-        }.distinctBy { it.component.packageName }
-    }
-
-    /** Makes [c] the default home screen (needs the ADB link). Pair(exit code, text). */
-    fun setHome(c: android.content.ComponentName): Pair<Int, String> = sh("cmd package set-home-activity --user 0 ${c.flattenToShortString()}")
-
     // ------------------------------------------------------------ free memory (works without ADB)
 
     private fun avail(ctx: Context): Long {
