@@ -42,6 +42,8 @@ class SettingsActivity : Activity() {
     private var selectedIndex = ArrayList<Int>()
 
     private val p by lazy { Prefs(this) }
+    private val TV_MANAGER = "com.elias.tvmanager"
+
     private fun toast(s: String) = Toast.makeText(this, L.t(s), Toast.LENGTH_SHORT).show()
     private fun choose(title: String, items: List<Pair<String, () -> Unit>>) { Menus.show(this, title, items) }
     private fun reschedule() = AdhanScheduler.reschedule(this)
@@ -69,8 +71,16 @@ class SettingsActivity : Activity() {
             Row.Nav("Accessibility", go = sys(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
             Row.Nav("Apps", go = sys(Settings.ACTION_APPLICATION_SETTINGS)),
             Row.Nav("Network", go = sys(Settings.ACTION_WIFI_SETTINGS)),
-            Row.Nav("System", go = sys(Settings.ACTION_SETTINGS))
+            Row.Nav("System", go = sys(Settings.ACTION_SETTINGS)),
+            Row.Nav("TV Manager", go = { openTvManager() })
         )
+    }
+
+    /** TV Manager (the user's own debloat / tweaks app, package com.elias.tvmanager) opens from here; if it is not installed, say so. */
+    private fun openTvManager() {
+        val i = packageManager.getLeanbackLaunchIntentForPackage(TV_MANAGER) ?: packageManager.getLaunchIntentForPackage(TV_MANAGER)
+        if (i == null) { toast("TV Manager is not installed"); return }
+        try { startActivity(i) } catch (_: Exception) { toast("Not available on this device") }
     }
 
     private fun general() = Page("General") {

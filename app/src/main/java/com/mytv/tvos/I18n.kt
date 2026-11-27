@@ -8,6 +8,7 @@ object L {
         "Settings" to "الإعدادات", "General" to "عام", "Home Screen" to "الشاشة الرئيسية", "Prayer and Adhan" to "الأذان ومواقيت الصلاة",
         "Screen Saver" to "شاشة التوقف", "Video and Audio" to "الفيديو والصوت", "Remotes and Devices" to "الريموت والأجهزة",
         "Accessibility" to "سهولة الاستخدام", "Apps" to "التطبيقات", "Network" to "الشبكة", "System" to "النظام",
+        "TV Manager" to "مدير التلفاز", "TV Manager is not installed" to "مدير التلفاز غير مثبّت",
         "Appearance" to "المظهر", "Language and Region" to "اللغة والمنطقة", "Date and Time" to "التاريخ والوقت", "Storage" to "التخزين", "About" to "حول",
         "Language" to "اللغة", "English" to "English", "Time Format" to "صيغة الوقت", "Numerals" to "الأرقام", "Use Prayer City" to "استخدام مدينة الصلاة", "Hide Weather on Home Screen" to "إخفاء الطقس من الشاشة الرئيسية", "Show the weather only on the Weather page." to "عرض الطقس في صفحة الطقس فقط.", "Text Contrast" to "تباين الخطوط", "Normal" to "عادي", "High" to "عالٍ", "Maximum" to "أقصى", "Custom Color" to "لون مخصص", "Hue" to "الصبغة", "Saturation" to "التشبع", "Brightness" to "السطوع", "Done" to "تم", "English (0-9)" to "إنجليزية (0-9)", "Arabic (٠-٩)" to "عربية (٠-٩)", "24-Hour" to "24 ساعة", "12-Hour" to "12 ساعة", "System" to "النظام",
         "Time Zone" to "المنطقة الزمنية", "Automatic" to "تلقائي", "Automatic (by city)" to "تلقائي (حسب المدينة)", "UTC+3 (Amman, summer time)" to "UTC+3 (عمّان، توقيت صيفي)",
