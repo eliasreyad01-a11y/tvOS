@@ -334,6 +334,16 @@ class FeatureTest {
         assertTrue(Net2.parseBing("nope").isEmpty())
     }
 
+    @Test fun newAppShowsUpInAnOpenAppsPage() {
+        val a = home()
+        a.setApps(fake(5)); idle()
+        call(a, "openPage", 1); idle(); layout(a.window.decorView); idle()
+        val before: View? = field(a, "pageView")
+        a.setApps(fake(6)); idle(); layout(a.window.decorView); idle()
+        val after: View? = field(a, "pageView")
+        assertTrue("the Apps page is rebuilt when an app is added", before !== after && after != null)
+    }
+
     @Test fun rightFromTheVolumeBarDoesNotJumpBackToSleep() {
         val a = home()
         call(a, "openCC"); idle(); layout(a.window.decorView); idle()

@@ -418,6 +418,7 @@ class MainActivity : Activity() {
     private fun setPage(i: Int) { pageItems.forEachIndexed { j, v -> v.isSelected = j == i } }
 
     private var pageView: View? = null
+    private var pageIdx = 0
     private val pages by lazy { Pages(this) }
 
     /** Opens a full page below the pages bar: the home grid and clock step aside, the wallpaper stays visible behind it. */
@@ -425,6 +426,7 @@ class MainActivity : Activity() {
         closePage(false)
         closeCC(); closeFolder()
         pageView = v
+        pageIdx = i
         setPage(i)
         grid.visibility = View.INVISIBLE
         infoBlock.visibility = View.INVISIBLE
@@ -507,6 +509,19 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    /** Installs and removals made while another app was in front are missed by the receiver: compare package names cheaply on return. */
+    private fun syncAppsIfChanged() {
+        if (apps.isEmpty()) return
+        Thread {
+            val pm = packageManager
+            val now = (pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0) +
+                pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0))
+                .map { it.activityInfo.packageName }.filter { it != packageName }.toSet()
+            val have = apps.map { it.pkg }.filter { it != Store.SETTINGS_PKG }.toSet()
+            if (now != have) runOnUiThread { if (!isDestroyed) loadAppsAsync() }
+        }.start()
+    }
+
     private fun queryApps(): List<AppItem> {
         val pm = packageManager
         val lean = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
@@ -535,8 +550,11 @@ class MainActivity : Activity() {
 
     /** Also the entry point for tests, which supply their own apps. */
     fun setApps(list: List<AppItem>) {
+        val before = apps.map { it.pkg }.toSet()
         apps = list.filter { it.pkg != Store.SETTINGS_PKG } + settingsItem()
         relayout(lastFocusKey)
+        // An open Apps page keeps its own copy of the list: rebuild it so a new app shows up at once.
+        if (pageView != null && pageIdx == 1 && before != apps.map { it.pkg }.toSet()) showPage(1, pages.apps())
     }
 
     internal fun applyOptions(): Boolean {
@@ -1191,6 +1209,7 @@ class MainActivity : Activity() {
         }
         ContextCompat.registerReceiver(this, pkgReceiver, f, ContextCompat.RECEIVER_EXPORTED)
         if (reloadAppsOnStart) { reloadAppsOnStart = false; loadAppsAsync() }
+        else syncAppsIfChanged()
         Net.start(applicationContext)
     }
 
