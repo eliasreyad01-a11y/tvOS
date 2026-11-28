@@ -198,7 +198,7 @@ class SettingsActivity : Activity() {
     private fun showWhy(err: String) {
         android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
             .setTitle(L.t("Could not connect"))
-            .setMessage(err + "\n\n" + L.t("Turn on Wireless debugging (Android 11+, pair first) or Network debugging in Developer options, then try again."))
+            .setMessage(err + "\n\n" + L.t("Turn on USB debugging in Developer options. If the TV asks Allow USB debugging, choose Always allow, then try again."))
             .setPositiveButton(L.t("OK"), null).show()
     }
 

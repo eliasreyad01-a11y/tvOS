@@ -35,18 +35,25 @@ object TvManager {
         prep(ctx)
         disconnect()
         val tried = ArrayList<String>()
-        // The saved port first, then whatever the TV itself says it listens on (Wireless debugging and Network debugging).
-        for (p in (listOf(port) + detectedPorts()).distinct()) {
+        // With "USB debugging" alone the TV's adbd still listens on the network (port 5555): the same door the phone app used.
+        // Try this device through its loopback address first, then through its own address on the network.
+        for (h in listOf(HOST) + ownAddresses()) for (p in (listOf(port, 5555) + detectedPorts()).distinct()) {
             try {
-                val k = Kadb.create(HOST, p)
+                val k = Kadb.create(h, p)
                 val r = k.shell("echo ok")
                 if (r.exitCode == 0 && r.output.contains("ok")) { kadb = k; return null }
                 try { k.close() } catch (_: Exception) {}
-                tried.add("$p: refused")
-            } catch (e: Throwable) { tried.add("$p: ${(e.message ?: e.javaClass.simpleName).take(70)}") }
+                tried.add("$h:$p: refused")
+            } catch (e: Throwable) { tried.add("$h:$p: ${(e.message ?: e.javaClass.simpleName).take(60)}") }
         }
         return tried.joinToString("\n")
     }
+
+    /** This TV's own IPv4 addresses on Wi-Fi / Ethernet. */
+    fun ownAddresses(): List<String> = try {
+        java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces()).filter { it.isUp && !it.isLoopback }
+            .flatMap { java.util.Collections.list(it.inetAddresses) }.filterIsInstance<java.net.Inet4Address>().map { it.hostAddress ?: "" }.filter { it.isNotEmpty() }
+    } catch (_: Throwable) { emptyList() }
 
     /** Ports Android publishes: service.adb.tls.port (Wireless debugging) and service.adb.tcp.port (Network debugging). */
     fun detectedPorts(): List<Int> = listOf("service.adb.tls.port", "persist.adb.tcp.port", "service.adb.tcp.port").mapNotNull { key ->

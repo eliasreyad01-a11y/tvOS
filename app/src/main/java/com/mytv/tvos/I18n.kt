@@ -28,7 +28,7 @@ object L {
         "Open the TV's Original Launcher" to "فتح لانشر التلفاز الأصلي",
         "Opens it now without changing the default. The Home button comes back here." to "يفتحه الآن بدون تغيير الافتراضي. زر Home يرجعك هنا.",
         "Could not open it. Connect to the TV first (TV Manager)." to "تعذّر فتحه. اتصل بالتلفاز أولاً (مدير التلفاز).",
-        "Turn on Wireless debugging (Android 11+, pair first) or Network debugging in Developer options, then try again." to "فعّل التصحيح اللاسلكي (أندرويد 11 وما فوق، ونفّذ الاقتران أولاً) أو تصحيح الشبكة من خيارات المطوّر، ثم أعد المحاولة.",
+        "Turn on USB debugging in Developer options. If the TV asks Allow USB debugging, choose Always allow, then try again." to "فعّل تصحيح USB من خيارات المطوّر. إذا سأل التلفاز «السماح بتصحيح USB؟» اختر «السماح دائماً» ثم أعد المحاولة.",
         "HOME SCREEN" to "الشاشة الرئيسية",
         "Default Home Screen" to "الشاشة الرئيسية الافتراضية",
         "No other home screen is installed" to "لا توجد شاشة رئيسية أخرى مثبّتة",
