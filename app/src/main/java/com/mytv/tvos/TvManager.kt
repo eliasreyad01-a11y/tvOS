@@ -34,12 +34,27 @@ object TvManager {
     fun connect(ctx: Context, port: Int): String? {
         prep(ctx)
         disconnect()
-        return try {
-            val k = Kadb.create(HOST, port)
-            val r = k.shell("echo ok")
-            if (r.exitCode != 0 || !r.output.contains("ok")) { try { k.close() } catch (_: Exception) {}; "The TV refused the connection" }
-            else { kadb = k; null }
-        } catch (e: Throwable) { e.message?.take(80) ?: e.javaClass.simpleName }
+        val tried = ArrayList<String>()
+        // The saved port first, then whatever the TV itself says it listens on (Wireless debugging and Network debugging).
+        for (p in (listOf(port) + detectedPorts()).distinct()) {
+            try {
+                val k = Kadb.create(HOST, p)
+                val r = k.shell("echo ok")
+                if (r.exitCode == 0 && r.output.contains("ok")) { kadb = k; return null }
+                try { k.close() } catch (_: Exception) {}
+                tried.add("$p: refused")
+            } catch (e: Throwable) { tried.add("$p: ${(e.message ?: e.javaClass.simpleName).take(70)}") }
+        }
+        return tried.joinToString("\n")
+    }
+
+    /** Ports Android publishes: service.adb.tls.port (Wireless debugging) and service.adb.tcp.port (Network debugging). */
+    fun detectedPorts(): List<Int> = listOf("service.adb.tls.port", "persist.adb.tcp.port", "service.adb.tcp.port").mapNotNull { key ->
+        try {
+            val pr = Runtime.getRuntime().exec(arrayOf("getprop", key))
+            val v = pr.inputStream.bufferedReader().readText().trim().toIntOrNull()
+            v?.takeIf { it in 1..65535 }
+        } catch (_: Throwable) { null }
     }
 
     /** Pairing with a code (Android 11+ Wireless debugging › Pair device with pairing code). Returns null on success. */

@@ -188,10 +188,18 @@ class SettingsActivity : Activity() {
             val err = TvManager.connect(applicationContext, TvManager.port(prefs))
             ui {
                 if (err == null) toast("Connected")
-                else { toast("Could not connect"); descView.text = L.t(err) }
+                else showWhy(err)
                 refresh()
             }
         }.start()
+    }
+
+    /** The real reason, in a dialog (a line under the list is overwritten as soon as the list redraws). */
+    private fun showWhy(err: String) {
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
+            .setTitle(L.t("Could not connect"))
+            .setMessage(err + "\n\n" + L.t("Turn on Wireless debugging (Android 11+, pair first) or Network debugging in Developer options, then try again."))
+            .setPositiveButton(L.t("OK"), null).show()
     }
 
     private fun adb(done: String, cmd: String, pkg: String? = null, log: String? = null) {
