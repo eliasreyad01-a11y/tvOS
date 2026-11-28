@@ -189,10 +189,15 @@ object TvManager {
             "cmd role add-role-holder --user 0 android.app.role.HOME ${h.pkg}",
             "pm set-home-activity ${h.component}"
         )
+        fun roleHolder(): String = sh("cmd role get-role-holders --user 0 android.app.role.HOME").second.trim().lines().lastOrNull().orEmpty()
         for (cmd in attempts) {
             val r = sh(cmd)
-            log.append(cmd.substringBefore(' ')).append(' ').append(cmd.substringAfter(' ').take(28)).append(": ").append(r.second.take(60)).append('\n')
-            if (nowHome() == h.pkg) return 0 to ""
+            val out = r.second.trim()
+            log.append(cmd.substringBefore(' ')).append(' ').append(cmd.substringAfter(' ').take(28)).append(": ").append(out.take(60)).append('\n')
+            // Several firmwares answer resolve-activity with something else even after a successful change, so the system's own
+            // "Success" and the HOME role holder count too.
+            if (nowHome() == h.pkg || roleHolder() == h.pkg) return 0 to ""
+            if (out.contains("Success", true) && !out.contains("error", true)) return 0 to ""
         }
         return 1 to ("This TV did not accept the change.\n" + log.toString().trim())
     }

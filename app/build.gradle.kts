@@ -11,8 +11,8 @@ android {
         applicationId = "com.mytv.tvos"
         minSdk = 26
         targetSdk = 34
-        versionCode = 45
-        versionName = "3.0.11"
+        versionCode = 46
+        versionName = "3.0.12"
     }
 
     signingConfigs {
