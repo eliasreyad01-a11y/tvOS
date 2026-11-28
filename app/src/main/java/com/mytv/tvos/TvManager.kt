@@ -23,7 +23,23 @@ object TvManager {
 
     val connected: Boolean get() = kadb != null
 
+    @Volatile private var providerReady = false
+
+    /**
+     * Android's own RSA keys do not always implement RSAPrivateCrtKey, which Kadb needs ("Only RSA private keys with CRT
+     * parameters are supported"). BouncyCastle's keys do, so its full copy, the one bundled with the app, goes first.
+     */
+    private fun useBundledBouncyCastle() {
+        if (providerReady) return
+        try {
+            java.security.Security.removeProvider("BC")
+            java.security.Security.insertProviderAt(Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider").getDeclaredConstructor().newInstance() as java.security.Provider, 1)
+        } catch (_: Throwable) {}
+        providerReady = true
+    }
+
     private fun prep(ctx: Context) {
+        useBundledBouncyCastle()
         // Kadb keeps its ADB identity (the key the TV asks you to trust once) under the user's home directory.
         System.setProperty("user.home", ctx.filesDir.absolutePath)
     }
