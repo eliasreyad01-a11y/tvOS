@@ -116,6 +116,17 @@ object TvManager {
         ctx.packageManager.resolveActivity(homeIntent(), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName?.takeIf { it != "android" }
     } catch (_: Exception) { null }
 
+    /** Opens the TV's original launcher on top, without changing the default: the Home key still comes back here. */
+    fun openOriginalHome(ctx: Context): Boolean {
+        val other = homes(ctx).filter { it.pkg != ctx.packageName }
+        val h = other.firstOrNull { it.pkg == "com.google.android.tvlauncher" || it.pkg == "com.google.android.leanbacklauncher" } ?: other.firstOrNull() ?: return false
+        return try {
+            val i = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
+                .setComponent(android.content.ComponentName.unflattenFromString(h.component)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.startActivity(i); true
+        } catch (_: Exception) { false }
+    }
+
     /** Makes [h] the launcher of the Home key (it is turned on first in case it had been disabled). */
     fun setHome(h: HomeApp): Pair<Int, String> = sh("pm enable ${h.pkg}; cmd package set-home-activity ${h.component}")
 

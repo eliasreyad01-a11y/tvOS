@@ -1,0 +1,13 @@
+# Shrink only (no renaming): safer for the libraries that find their classes by name.
+-dontobfuscate
+-keep class com.flyfishxu.kadb.** { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.conscrypt.** { *; }
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
+-dontwarn javax.naming.**
+-dontwarn java.lang.management.**
+-dontwarn org.slf4j.**
+-dontwarn kotlin.**

@@ -105,7 +105,10 @@ class SettingsActivity : Activity() {
     private fun tvHome() = Page("Default Launcher") {
         val cur = TvManager.currentHome(this)
         val all = TvManager.homes(this)
-        (if (all.size < 2) listOf<Row>(Row.Label("No other launcher was found on this TV")) else emptyList()) + all.map { h ->
+        (if (all.size < 2) listOf<Row>(Row.Label("No other launcher was found on this TV"))
+        else listOf<Row>(Row.Nav("Open the TV's Original Launcher", { null }, true, "Opens it now without changing the default. The Home button comes back here.") {
+            if (!TvManager.openOriginalHome(this)) toast("No other launcher was found on this TV")
+        })) + all.map { h ->
             Row.Nav(h.label, { if (h.pkg == cur) "✓" else null }, false) {
                 if (h.pkg == cur) return@Nav
                 Thread {

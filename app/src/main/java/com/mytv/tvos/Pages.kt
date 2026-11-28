@@ -35,15 +35,16 @@ class OnlineWp(val title: String, val thumb: String, val full: String)
 object Thumbs {
     // Newest request first: the pictures on screen load before the ones already scrolled past, and a request whose tile has been
     // recycled is dropped before it downloads anything. (A plain FIFO pool made every scroll wait behind all the earlier tiles.)
-    private val pool = java.util.concurrent.ThreadPoolExecutor(4, 4, 30, java.util.concurrent.TimeUnit.SECONDS,
-        object : java.util.concurrent.LinkedBlockingDeque<Runnable>() { override fun offer(e: Runnable) = offerFirst(e) })
+    private val lowPriority = java.util.concurrent.ThreadFactory { r -> Thread(r, "thumbs").apply { priority = Thread.MIN_PRIORITY; isDaemon = true } }
+    private val pool = java.util.concurrent.ThreadPoolExecutor(2, 2, 30, java.util.concurrent.TimeUnit.SECONDS,
+        object : java.util.concurrent.LinkedBlockingDeque<Runnable>() { override fun offer(e: Runnable) = offerFirst(e) }, lowPriority)
     private val main = Handler(Looper.getMainLooper())
     private val cache = object : LruCache<String, Bitmap>(64 * 1024 * 1024) { override fun sizeOf(key: String, value: Bitmap) = value.byteCount }
 
     fun get(url: String): Bitmap? = cache.get(url)
 
     // Quietly fetches the pictures just below the visible rows, one at a time, so a scroll finds them ready instead of grey.
-    private val ahead = Executors.newSingleThreadExecutor()
+    private val ahead = Executors.newSingleThreadExecutor(lowPriority)
     fun prefetch(url: String) {
         if (cache.get(url) != null) return
         ahead.execute { if (cache.get(url) == null) fetch(url)?.let { cache.put(url, it) } }

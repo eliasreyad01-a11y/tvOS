@@ -149,7 +149,7 @@ class AdhanService : Service() {
         releasePlayer()
         takeAudioFocus()
         val prefs = Prefs(this)
-        val rawId = resources.getIdentifier("adhan", "raw", packageName)
+        val rawId = R.raw.adhan
 
         val sources = ArrayList<(MediaPlayer) -> Unit>()
         prefs.adhanUri?.let { custom ->

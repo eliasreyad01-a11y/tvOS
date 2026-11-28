@@ -11,8 +11,8 @@ android {
         applicationId = "com.mytv.tvos"
         minSdk = 26
         targetSdk = 34
-        versionCode = 38
-        versionName = "3.0.4"
+        versionCode = 39
+        versionName = "3.0.5"
     }
 
     signingConfigs {
@@ -26,7 +26,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -37,7 +38,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    packaging { resources { excludes += setOf("META-INF/versions/**", "META-INF/*.kotlin_module", "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/AL2.0", "META-INF/LGPL2.1", "DebugProbesKt.bin") } }
+    packaging { resources { excludes += setOf("META-INF/versions/**", "META-INF/*.kotlin_module", "META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/AL2.0", "META-INF/LGPL2.1", "DebugProbesKt.bin",
+        // BouncyCastle ships post-quantum tables and cert-path messages in many languages that nothing here uses.
+        "org/bouncycastle/pqc/**", "org/bouncycastle/x509/CertPathReviewerMessages*", "org/bouncycastle/pkix/CertPathReviewerMessages*", "org/bouncycastle/**/*.properties") } }
 
     testOptions { unitTests { isIncludeAndroidResources = true } }
 }
