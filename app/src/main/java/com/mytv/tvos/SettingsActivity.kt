@@ -114,7 +114,13 @@ class SettingsActivity : Activity() {
                 Thread {
                     if (ensureTv()) {
                         val r = TvManager.setHome(h)
-                        ui { if (r.first == 0) toast("Default launcher changed") else { toast("Could not change the launcher"); showWhy(r.second, "Could not change the launcher", false) }; refresh() }
+                        val other = if (r.first == 0) TvManager.resolvedHome().takeIf { it.isNotEmpty() && it != h.pkg && it != "android" } else null
+                        ui {
+                            if (r.first != 0) { toast("Could not change the launcher"); showWhy(r.second, "Could not change the launcher", false) }
+                            else if (other != null) askDisableOther(other, h)
+                            else toast("Default launcher changed")
+                            refresh()
+                        }
                     } else ui {
                         // No ADB link: the best that is possible is to open the system's own choice, if the TV has one.
                         try { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) } catch (_: Exception) { toast("Connect to the TV first") }
@@ -122,6 +128,22 @@ class SettingsActivity : Activity() {
                 }.start()
             }
         }
+    }
+
+    /** The TV still opens its own launcher on Home: offer to switch that one off (it can be turned back on from Restore). */
+    private fun askDisableOther(pkg: String, h: TvManager.HomeApp) {
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
+            .setTitle(L.t("The TV still opens its own launcher"))
+            .setMessage(L.t("Switch off the original launcher so Home opens this one? You can turn it back on from Restore.") + "\n\n" + pkg)
+            .setPositiveButton(L.t("Switch off")) { _, _ ->
+                Thread {
+                    val r = TvManager.sh("pm disable-user --user 0 $pkg")
+                    if (r.first == 0) { TvManager.log(prefs, pkg, "disabled"); TvManager.sh("cmd package set-home-activity --user 0 ${h.component}") }
+                    TvManager.invalidate()
+                    ui { toast(if (r.first == 0) "Original launcher switched off" else "Could not switch it off"); refresh() }
+                }.start()
+            }
+            .setNegativeButton(L.t("Cancel"), null).show()
     }
 
     private fun freeMem() {

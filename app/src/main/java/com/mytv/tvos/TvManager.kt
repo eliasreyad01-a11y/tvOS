@@ -177,6 +177,10 @@ object TvManager {
     }
 
     /** Makes [h] the launcher of the Home key (it is turned on first in case it had been disabled). */
+    /** Package the system really opens on Home right now ("" when unknown). */
+    fun resolvedHome(): String = sh("cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME").second
+        .lines().lastOrNull { it.contains("/") }?.trim()?.substringBefore('/') ?: ""
+
     fun setHome(h: HomeApp): Pair<Int, String> {
         sh("pm enable ${h.pkg}")
         val log = StringBuilder()
