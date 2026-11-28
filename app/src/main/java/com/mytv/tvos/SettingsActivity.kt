@@ -114,7 +114,7 @@ class SettingsActivity : Activity() {
                 Thread {
                     if (ensureTv()) {
                         val r = TvManager.setHome(h)
-                        ui { if (r.first == 0) toast("Default launcher changed") else { toast("Could not change the launcher"); descView.text = L.t(r.second).take(120) }; refresh() }
+                        ui { if (r.first == 0) toast("Default launcher changed") else { toast("Could not change the launcher"); showWhy(r.second, "Could not change the launcher", false) }; refresh() }
                     } else ui {
                         // No ADB link: the best that is possible is to open the system's own choice, if the TV has one.
                         try { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) } catch (_: Exception) { toast("Connect to the TV first") }
@@ -195,10 +195,11 @@ class SettingsActivity : Activity() {
     }
 
     /** The real reason, in a dialog (a line under the list is overwritten as soon as the list redraws). */
-    private fun showWhy(err: String) {
+    private fun showWhy(err: String, title: String = "Could not connect", hint: Boolean = true) {
         android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
-            .setTitle(L.t("Could not connect"))
-            .setMessage(err + "\n\n" + L.t("Turn on USB debugging in Developer options. If the TV asks Allow USB debugging, choose Always allow, then try again."))
+            .setTitle(L.t(title))
+            .setMessage(if (hint) err + "\n\n" + L.t("Turn on USB debugging in Developer options. If the TV asks Allow USB debugging, choose Always allow, then try again.")
+                        else err.lines().let { L.t(it.first()) + "\n" + it.drop(1).joinToString("\n") })
             .setPositiveButton(L.t("OK"), null).show()
     }
 

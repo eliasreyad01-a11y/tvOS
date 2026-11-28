@@ -177,7 +177,25 @@ object TvManager {
     }
 
     /** Makes [h] the launcher of the Home key (it is turned on first in case it had been disabled). */
-    fun setHome(h: HomeApp): Pair<Int, String> = sh("pm enable ${h.pkg}; cmd package set-home-activity ${h.component}")
+    fun setHome(h: HomeApp): Pair<Int, String> {
+        sh("pm enable ${h.pkg}")
+        val log = StringBuilder()
+        // Which launcher Android would open on Home right now (package name), read through the system itself.
+        fun nowHome(): String = sh("cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME").second
+            .lines().lastOrNull { it.contains("/") }?.trim()?.substringBefore('/') ?: ""
+        val attempts = listOf(
+            "cmd package set-home-activity --user 0 ${h.component}",
+            "cmd package set-home-activity ${h.component}",
+            "cmd role add-role-holder --user 0 android.app.role.HOME ${h.pkg}",
+            "pm set-home-activity ${h.component}"
+        )
+        for (cmd in attempts) {
+            val r = sh(cmd)
+            log.append(cmd.substringBefore(' ')).append(' ').append(cmd.substringAfter(' ').take(28)).append(": ").append(r.second.take(60)).append('\n')
+            if (nowHome() == h.pkg) return 0 to ""
+        }
+        return 1 to ("This TV did not accept the change.\n" + log.toString().trim())
+    }
 
     // ------------------------------------------------------------ memory and storage
 
