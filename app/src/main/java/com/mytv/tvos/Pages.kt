@@ -102,17 +102,32 @@ object Net2 {
      * Bing's "Image of the day" archive (chosen by Microsoft's editors, 3840 x 2160 "UHD" files), then the "Featured pictures" of
      * Wikimedia Commons, which the community reviews and votes on one by one.
      */
+    /** Nine pictures only, so the page stays quick: Bing's newest, topped up from Commons if Bing could not be reached. */
+    const val WALLPAPER_COUNT = 9
+
     fun wallpapers(): List<OnlineWp> {
         val out = ArrayList<OnlineWp>()
-        for (idx in listOf(0, 8)) {
-            val body = try { download("https://www.bing.com/HPImageArchive.aspx?format=js&idx=$idx&n=8&mkt=en-US", 200_000)?.toString(Charsets.UTF_8) } catch (_: Exception) { null }
-            if (body != null) out.addAll(parseBing(body))
+        for ((idx, n) in listOf(0 to 8, 8 to 1)) {
+            if (out.size >= WALLPAPER_COUNT) break
+            val body = try { download("https://www.bing.com/HPImageArchive.aspx?format=js&idx=$idx&n=$n&mkt=en-US", 200_000)?.toString(Charsets.UTF_8) } catch (_: Exception) { null }
+            if (body != null) for (w in parseBing(body)) if (out.none { it.full == w.full }) out.add(w)
         }
-        val cats = listOf("Featured_pictures_of_landscapes", "Featured_pictures_of_skies", "Featured_pictures_of_mountains",
-            "Featured_pictures_of_sunsets", "Featured_pictures_of_lakes", "Featured_pictures_of_beaches")
-        for (cat in cats) for (w in commons(cat)) if (out.none { it.full == w.full }) out.add(w)
-        return out
+        if (out.size < WALLPAPER_COUNT) for (w in commons("Featured_pictures_of_landscapes")) if (out.none { it.full == w.full }) out.add(w)
+        return out.take(WALLPAPER_COUNT)
     }
+
+    /** The saved list (so the page opens at once) and when it was fetched; refreshed after [REFRESH_MS]. */
+    const val REFRESH_MS = 6 * 3600_000L
+
+    fun saveList(sp: android.content.SharedPreferences, l: List<OnlineWp>) {
+        val arr = org.json.JSONArray(); l.forEach { arr.put(org.json.JSONArray(listOf(it.title, it.thumb, it.full))) }
+        sp.edit().putString("wp_list", arr.toString()).putLong("wp_time", System.currentTimeMillis()).apply()
+    }
+
+    fun savedList(sp: android.content.SharedPreferences): List<OnlineWp> = try {
+        val arr = org.json.JSONArray(sp.getString("wp_list", "[]"))
+        (0 until arr.length()).map { val o = arr.getJSONArray(it); OnlineWp(o.getString(0), o.getString(1), o.getString(2)) }
+    } catch (_: Exception) { emptyList() }
 
     /** Bing HPImageArchive: {"images":[{"urlbase":"/th?id=OHR.Name_EN-US123","title":"..."}]}; "_UHD.jpg" is the 3840 x 2160 file. */
     fun parseBing(json: String): List<OnlineWp> {
@@ -441,7 +456,7 @@ class Pages(private val a: MainActivity) {
         val items = ArrayList<OnlineWp>()
         val ad = WpAdapter(items)
         val rv = RecyclerView(a).apply {
-            layoutManager = RowScrollGrid(a, 4)
+            layoutManager = RowScrollGrid(a, 3)
             adapter = ad
             itemAnimator = null
             setHasFixedSize(true); setItemViewCacheSize(12)
@@ -456,11 +471,13 @@ class Pages(private val a: MainActivity) {
         }
         col.addView(rv, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
-        // Bing's daily pictures go first once the list arrives.
-        Thread {
+        // The nine pictures of the last visit show at once; a fresh list is fetched when they are older than six hours.
+        items.addAll(Net2.savedList(a.sp)); ad.notifyDataSetChanged()
+        if (items.isEmpty() || System.currentTimeMillis() - a.sp.getLong("wp_time", 0L) > Net2.REFRESH_MS) Thread {
             val all = Net2.wallpapers()
             ui.post {
-                if (a.isDestroyed || root.parent == null) return@post
+                if (a.isDestroyed || root.parent == null || all.isEmpty()) return@post
+                Net2.saveList(a.sp, all)
                 items.clear(); items.addAll(all); ad.notifyDataSetChanged()
             }
         }.start()

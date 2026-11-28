@@ -925,7 +925,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(round(R.drawable.ic_search, "Search") { showSearch() })
             addView(round(R.drawable.ic_access, "Accessibility") { startSafe(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
-            addView(round(R.drawable.ic_home, "TV Home") { closeCC(); if (!TvManager.openOriginalHome(this@MainActivity)) toast("No other launcher was found on this TV") })
+            addView(round(R.drawable.ic_home, "TV Home") { closeCC(); TvManager.openOriginalHome(this@MainActivity) { ok -> if (!ok) toast("Could not open it. Connect to the TV first (TV Manager).") } })
             addView(round(R.drawable.ic_gear, "Settings") { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) })
         }
         panel.addView(rowA); panel.addView(rowB); panel.addView(rowC)

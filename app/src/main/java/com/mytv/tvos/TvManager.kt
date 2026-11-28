@@ -102,12 +102,15 @@ object TvManager {
     private fun homeIntent() = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
 
     /** Every launcher installed on the TV (this one and the original Android one among them). */
+    /** Things that answer the Home intent but are not launchers: Android\'s own chooser and the settings app. */
+    private val NOT_LAUNCHERS = setOf("android", "com.android.settings", "com.android.tv.settings", "com.android.provision", "com.google.android.setupwizard")
+
     fun homes(ctx: Context): List<HomeApp> {
         val pm = ctx.packageManager
         return try {
             pm.queryIntentActivities(homeIntent(), PackageManager.MATCH_ALL or PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS).map {
                 HomeApp(it.activityInfo.packageName, "${it.activityInfo.packageName}/${it.activityInfo.name}", it.loadLabel(pm).toString())
-            }.distinctBy { it.component }
+            }.distinctBy { it.component }.filter { it.pkg !in NOT_LAUNCHERS }
         } catch (_: Exception) { emptyList() }
     }
 
@@ -117,14 +120,22 @@ object TvManager {
     } catch (_: Exception) { null }
 
     /** Opens the TV's original launcher on top, without changing the default: the Home key still comes back here. */
-    fun openOriginalHome(ctx: Context): Boolean {
+    fun openOriginalHome(ctx: Context, done: (Boolean) -> Unit) {
         val other = homes(ctx).filter { it.pkg != ctx.packageName }
-        val h = other.firstOrNull { it.pkg == "com.google.android.tvlauncher" || it.pkg == "com.google.android.leanbacklauncher" } ?: other.firstOrNull() ?: return false
-        return try {
-            val i = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
-                .setComponent(android.content.ComponentName.unflattenFromString(h.component)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            ctx.startActivity(i); true
-        } catch (_: Exception) { false }
+        val h = other.firstOrNull { it.pkg == "com.google.android.tvlauncher" || it.pkg == "com.google.android.leanbacklauncher" } ?: other.firstOrNull()
+        if (h == null) { done(false); return }
+        fun start(): Boolean = try {
+            ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
+                .setComponent(android.content.ComponentName.unflattenFromString(h.component)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); true
+        } catch (_: Throwable) { false }
+        if (start()) { done(true); return }
+        // It may have been disabled (for example by the debloater): turn it on again through ADB and retry.
+        if (!connected) { done(false); return }
+        Thread {
+            val ok = sh("pm enable ${h.pkg}").first == 0
+            if (ok) Thread.sleep(400)
+            android.os.Handler(android.os.Looper.getMainLooper()).post { done(ok && start()) }
+        }.start()
     }
 
     /** Makes [h] the launcher of the Home key (it is turned on first in case it had been disabled). */

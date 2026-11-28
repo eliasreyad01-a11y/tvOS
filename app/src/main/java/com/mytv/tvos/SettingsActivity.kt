@@ -107,7 +107,7 @@ class SettingsActivity : Activity() {
         val all = TvManager.homes(this)
         (if (all.size < 2) listOf<Row>(Row.Label("No other launcher was found on this TV"))
         else listOf<Row>(Row.Nav("Open the TV's Original Launcher", { null }, true, "Opens it now without changing the default. The Home button comes back here.") {
-            if (!TvManager.openOriginalHome(this)) toast("No other launcher was found on this TV")
+            TvManager.openOriginalHome(this) { ok -> if (!ok) toast("Could not open it. Connect to the TV first (TV Manager).") }
         })) + all.map { h ->
             Row.Nav(h.label, { if (h.pkg == cur) "✓" else null }, false) {
                 if (h.pkg == cur) return@Nav

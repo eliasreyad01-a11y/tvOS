@@ -27,6 +27,7 @@ object L {
         "TV Home" to "شاشة التلفاز الأصلية",
         "Open the TV's Original Launcher" to "فتح لانشر التلفاز الأصلي",
         "Opens it now without changing the default. The Home button comes back here." to "يفتحه الآن بدون تغيير الافتراضي. زر Home يرجعك هنا.",
+        "Could not open it. Connect to the TV first (TV Manager)." to "تعذّر فتحه. اتصل بالتلفاز أولاً (مدير التلفاز).",
         "HOME SCREEN" to "الشاشة الرئيسية",
         "Default Home Screen" to "الشاشة الرئيسية الافتراضية",
         "No other home screen is installed" to "لا توجد شاشة رئيسية أخرى مثبّتة",
